@@ -4,7 +4,8 @@ import express from "express";
 import mongoose, { model } from "mongoose";
 import path from "path";
 import encrypt from "mongoose-encryption";
-import crypto from "crypto";
+import bcrypt from "bcryptjs";
+const saltRounds = 10;
 
 const app = express();
 const __dirname = path.resolve();
@@ -15,15 +16,12 @@ app.use(express.urlencoded({ extended : true }));
 app.use(express.static("public"));
 
 mongoose.set('strictQuery', true);
-mongoose.connect("mongodb://localhost:27017/usersDB", {useNewUrlParser: true});
+mongoose.connect("mongodb://0.0.0.0:27017/usersDB", {useNewUrlParser: true, useUnifiedTopology : true});
 
 const userSchema = new mongoose.Schema( {
     Email : String,
     Password : String
 });
-
-
-userSchema.plugin(encrypt, {secret : process.env.SECRET , encryptedFields : ["Password"]})
 
 const User = mongoose.model("User", userSchema);
 
@@ -39,37 +37,34 @@ app.get("/register", function(req, res){
     res.render("register");
 });
 
-app.post("/register", function (req, res){
-    const pass = req.body.password;
-    const hash = crypto.createHash('sha256');
-    hash.update(pass);
-    const hashPas = hash.digest('base64');
-    const newUser = new User({
-        Email : req.body.username,
-        Password : hashPas
-    });
+app.get("/logout", function (req, res){
+    res.render("home");
+});
 
-    newUser.save();
-    res.render("secrets");
+app.post("/register", function (req, res){
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        const newUser = new User({
+            Email : req.body.username,
+            Password : hash
+        });
+        newUser.save();
+        res.render("secrets");
+    });
 });
 
 app.post("/login", function (req, res){
     const username = req.body.username;
-    const pass = req.body.password;
-    const hash = crypto.createHash('sha256');
-    hash.update(pass);
-    const hashPas = hash.digest('base64');
-    
     async function run(){
         try {
             const data = await User.findOne({Email : username});
-            if(data.Password === hashPas){
-                res.render("secrets");
-            }
-            else {
-                console.log("wrong password");
-                res.render("login");
-            }
+            bcrypt.compare(req.body.password, data.Password, function(err, result) {
+                if(result == true){
+                    res.render("secrets");
+                }
+                else{
+                    res.render("login");
+                }
+            });
         }
         catch(err){
             console.log(err);
