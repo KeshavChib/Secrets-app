@@ -4,6 +4,7 @@ import express from "express";
 import mongoose, { model } from "mongoose";
 import path from "path";
 import encrypt from "mongoose-encryption";
+import crypto from "crypto";
 
 const app = express();
 const __dirname = path.resolve();
@@ -39,9 +40,13 @@ app.get("/register", function(req, res){
 });
 
 app.post("/register", function (req, res){
+    const pass = req.body.password;
+    const hash = crypto.createHash('sha256');
+    hash.update(pass);
+    const hashPas = hash.digest('base64');
     const newUser = new User({
         Email : req.body.username,
-        Password : req.body.password
+        Password : hashPas
     });
 
     newUser.save();
@@ -51,11 +56,14 @@ app.post("/register", function (req, res){
 app.post("/login", function (req, res){
     const username = req.body.username;
     const pass = req.body.password;
+    const hash = crypto.createHash('sha256');
+    hash.update(pass);
+    const hashPas = hash.digest('base64');
     
     async function run(){
         try {
             const data = await User.findOne({Email : username});
-            if(data.Password === pass){
+            if(data.Password === hashPas){
                 res.render("secrets");
             }
             else {
